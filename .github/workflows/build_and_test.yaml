@@ -1,0 +1,45 @@
+name: ROS 2 Build and Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build_and_test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        ros_distribution:
+          - rolling
+
+    container:
+      image: ros:${{ matrix.ros_distribution }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          apt-get update
+          rosdep update
+          rosdep install --from-paths . --ignore-src -y
+
+      - name: Build package
+        run: |
+          source /opt/ros/${{ matrix.ros_distribution }}/setup.bash
+          mkdir -p /tmp/ws/src
+          cp -r . /tmp/ws/src/launch_test_pkg
+          cd /tmp/ws
+          colcon build --packages-select launch_test_pkg
+
+      - name: Run tests
+        run: |
+          source /opt/ros/${{ matrix.ros_distribution }}/setup.bash
+          source /tmp/ws/install/setup.bash
+          cd /tmp/ws
+          colcon test --packages-select launch_test_pkg
+          colcon test-result --all --verbose
